@@ -10,6 +10,7 @@ using Flow.Net.Sdk.Core;
 using Flow.Net.Sdk.Core.Cadence;
 using Flow.Net.Sdk.Core.Client;
 using Flow.Net.Sdk.Core.Models;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -40,10 +41,17 @@ namespace Fcl.Net.Core
             private set => _sdk = value;
         }
 
+        public FclWalletDiscovery Discovery
+        {
+            get => _discovery;
+            private set => SetProperty(ref _discovery, value);
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private FclUser _user;
         private IFlowClient _sdk;
+        private FclWalletDiscovery _discovery;
         private readonly ExecService _execService;
         private readonly FclConfig _fclConfig;
         private readonly IPlatform _platform;
@@ -56,13 +64,14 @@ namespace Fcl.Net.Core
         /// <param name="sdkClient"></param>
         /// <param name="platform"></param>
         /// <param name="strategies"></param>
-        public Fcl(FclConfig fclConfig, IFlowClient sdkClient, IPlatform platform, Dictionary<FclServiceMethod, IStrategy> strategies)
+        public Fcl(FclConfig fclConfig, IFlowClient sdkClient, IPlatform platform, Dictionary<FclServiceMethod, IStrategy> strategies, FclWalletDiscovery discovery = null)
         {
             _platform = platform;
             _execService = new ExecService(strategies);
             _fclConfig = fclConfig;
             _sdk = sdkClient;
             _strategies = strategies;
+            _discovery = discovery;
         }
 
         /// <summary>
@@ -71,6 +80,7 @@ namespace Fcl.Net.Core
         /// <exception cref="FclException"></exception>
         public async Task AuthenticateAsync()
         {
+            Console.WriteLine("AuthenticateAsync");
             try
             {
                 var service = (User != null && User.LoggedIn) ? User.Services.FirstOrDefault(f => f.Type == FclServiceType.AuthnRefresh) : GetDiscoveryService();
@@ -79,8 +89,11 @@ namespace Fcl.Net.Core
                     var serviceConfig = await GetServiceConfigAsync();
                     serviceConfig.DiscoveryAuthnInclude = _fclConfig.WalletDiscovery.Include;
 
+                    Console.WriteLine($"service: {JsonConvert.SerializeObject(service)}");
+                    Console.WriteLine("executing service...");
                     var response = await _execService.ExecuteAsync(service, serviceConfig, _fclConfig.AccountProof).ConfigureAwait(false);
-
+                    Console.WriteLine($"response.Status: {response.Status}");
+                    //Console.WriteLine($"response.Local.Provider: {JsonConvert.SerializeObject(response.Local.Provider)}");
                     if (response != null && response.Status == ResponseStatus.Approved)
                         SetCurrentUser(response);
                 }
@@ -413,6 +426,7 @@ pub fun main(
 
         private async Task<FclServiceConfig> GetServiceConfigAsync()
         {
+            Console.WriteLine("GetServiceConfigAsync");
             try
             {
                 var serviceConfig = new FclServiceConfig
@@ -424,16 +438,24 @@ pub fun main(
                         Hostname = _fclConfig.Location
                     }
                 };
-
+                Console.WriteLine($"serviceConfig: {serviceConfig}");
+                Console.WriteLine($"_platform: {(_platform == null ? "null" : "not null")}");
                 var clientServices = await _platform.GetClientServices();
-                if (clientServices != null)
+                Console.WriteLine($"clientServices: {(clientServices == null ? "null" : "not null")}");
+                if (clientServices != null && clientServices.Count > 0)
                     serviceConfig.Client.ClientServices = clientServices;
 
                 if (_strategies.ContainsKey(FclServiceMethod.WcRpc))
+                {
+                    Console.WriteLine("contains WcRpc");
                     serviceConfig.Client.ClientServices.Add(GetWallectConnectService());
+                }
 
                 foreach (var strategy in _strategies)
+                {
+                    Console.WriteLine($"Adding {strategy.Key}");
                     serviceConfig.Client.SupportedStrategies.Add(strategy.Key);
+                }
 
                 return serviceConfig;
             }

@@ -42,10 +42,13 @@ namespace Fcl.Net.Core.Service
 
         public async Task<HttpResponseMessage> FetchAsync(FclService service, Dictionary<string, object> data = null, HttpMethod httpMethod = null)
         {
+            Console.WriteLine("FetchAsync");
             if (httpMethod == null)
                 httpMethod = HttpMethod.Post;
 
             var msg = new HttpRequestMessage(httpMethod, BuildUrl(service));
+            Console.WriteLine($"url: {msg.RequestUri.AbsoluteUri}");
+            Console.WriteLine($"body: {JsonConvert.SerializeObject(data ?? service.Data)}");
 
             if (httpMethod != HttpMethod.Get)
                 msg.Content = new StringContent(JsonConvert.SerializeObject(data ?? service.Data), Encoding.UTF8, "application/json");
@@ -55,11 +58,15 @@ namespace Fcl.Net.Core.Service
 
         public async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
         {
+            Console.WriteLine("ReadResponseAsync");
             if (response == null || response.Content == null)
                 throw new FclException("Response was empty");
 
             try
             {
+                var rawResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Raw response: {rawResponse}");
+                    
                 using (var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
                 using (var streamReader = new System.IO.StreamReader(responseStream))
                 using (var jsonTextReader = new JsonTextReader(streamReader))
@@ -72,6 +79,10 @@ namespace Fcl.Net.Core.Service
             {
                 var message = "Could not deserialize the response body stream as " + typeof(T).FullName + ".";
                 throw new FclException(message, exception);
+            }
+            catch (Exception exception) 
+            {
+                throw new FclException("Failed deserialization", exception);
             }
         }
 
