@@ -77,13 +77,18 @@ namespace Fcl.Net.Core
         /// <summary>
         /// Authenticate user.
         /// </summary>
+        /// <param name="service"></param>
         /// <exception cref="FclException"></exception>
-        public async Task AuthenticateAsync()
+        public async Task AuthenticateAsync(FclService service = null)
         {
             Console.WriteLine("AuthenticateAsync");
             try
             {
-                var service = (User != null && User.LoggedIn) ? User.Services.FirstOrDefault(f => f.Type == FclServiceType.AuthnRefresh) : GetDiscoveryService();
+                if (service == null)
+                {
+                    service = (User != null && User.LoggedIn) ? User.Services.FirstOrDefault(f => f.Type == FclServiceType.AuthnRefresh) : GetDiscoveryService();
+                }
+                
                 if (service != null)
                 {
                     var serviceConfig = await GetServiceConfigAsync();
